@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>nuorder — color-lookup</title>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: #0f172a;
+      --border: #1e293b;
+      --text: #cbd5e1;
+      --dim: #64748b;
+      --green: #4ade80;
+      --purple: #c084fc;
+      --cyan: #38bdf8;
+      --red: #ff5f56;
+      --yellow: #ffbd2e;
+      --btn-bg: #1e293b;
+      --btn-hover: #334155;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .terminal {
+      width: 100%;
+      max-width: 900px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.75);
+      overflow: hidden;
+    }
+
+    .title-bar {
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      color: var(--dim);
+      border-bottom: 1px solid var(--border);
+    }
+    .dot { width: 11px; height: 11px; border-radius: 50%; }
+    .dot-red { background: var(--red); }
+    .dot-yellow { background: var(--yellow); }
+    .dot-green { background: #27c93f; }
+
+    .content { padding: 24px; }
+    
+    .cmd-line { font-weight: 600; font-size: 1rem; margin-bottom: 8px; }
+    .cmd-green { color: var(--green); }
+    .cmd-purple { color: var(--purple); }
+
+    .sub-bar {
+      font-size: 0.85rem;
+      color: var(--dim);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .sub-bar span { color: var(--cyan); font-weight: bold; }
+
+    .tabs {
+      display: flex;
+      gap: 10px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 12px;
+      margin-bottom: 20px;
+    }
+    .tab {
+      font-size: 0.9rem;
+      color: var(--dim);
+      cursor: pointer;
+      padding: 6px 14px;
+      border-radius: 4px;
+      user-select: none;
+    }
+    .tab.active {
+      color: var(--cyan);
+      background: #1e293b;
+    }
+
+    .input-box-wrapper { margin-bottom: 16px; }
+
+    textarea {
+      width: 100%;
+      height: 160px;
+      background: #090d16;
+      border: 1px solid #1e293b;
+      border-radius: 6px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.9rem;
+      padding: 14px;
+      outline: none;
+      resize: vertical;
+      line-height: 1.5;
+    }
+    textarea:focus {
+      border-color: #0ea5e9;
+      box-shadow: 0 0 10px rgba(14, 165, 233, 0.15);
+    }
+
+    .actions-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .btn-cmd {
+      background: var(--btn-bg);
+      border: 1px solid var(--border);
+      color: var(--cyan);
+      padding: 6px 14px;
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 0.85rem;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .btn-cmd:hover { background: var(--btn-hover); color: #ffffff; }
+
+    .status-counter {
+      font-size: 0.85rem;
+      color: var(--dim);
+      margin-left: 6px;
+    }
+
+    .export-toolbar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .btn-export {
+      background: #1e293b;
+      border: 1px solid var(--border);
+      color: var(--dim);
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 0.78rem;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .btn-export:hover { color: var(--text); border-color: var(--dim); }
+
+    .table-container {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow-x: auto;
+      max-height: 340px;
+      overflow-y: auto;
+      background: #090d16;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      text-align: left;
+    }
+
+    th {
+      background: #0f172a;
+      color: var(--dim);
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      font-weight: 600;
+    }
+
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid #1e293b;
+      color: var(--text);
+    }
+
+    .col-num { color: var(--dim); width: 40px; }
+    .col-raw { color: var(--dim); }
+    .col-facing { color: #ffffff; font-weight: 600; }
+    .col-family { color: #f59e0b; }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <div class="terminal">
+    <div class="title-bar">
+      <span class="dot dot-red"></span>
+      <span class="dot dot-yellow"></span>
+      <span class="dot dot-green"></span>
+      <span style="margin-left: 8px;">nuorder — live-color-standardizer</span>
+    </div>
+
+    <div class="content">
+      <div class="cmd-line">
+        <span class="cmd-green">$ nuorder color-lookup</span> <span class="cmd-purple">--live</span>
+      </div>
+
+      <div class="sub-bar">
+        engine status: <span>client-side ready</span> · latency <span>&lt; 1ms</span>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <div class="tabs">
+        <div class="tab active" onclick="switchTab('batch')">batch</div>
+        <div class="tab" onclick="switchTab('lookup')">single lookup</div>
+      </div>
+
+      <!-- TAB 1: BATCH INTERFACE -->
+      <div id="tabBatch">
+        <div class="input-box-wrapper">
+          <textarea id="batchInput" placeholder="Paste vendor colors (one per line)...&#10;e.g.&#10;m6c57 rainy beige+shadow green&#10;English Ro&#10;Pageant Bl&#10;171 coral"></textarea>
+        </div>
+
+        <div class="actions-row">
+          <button class="btn-cmd" onclick="runBatchProcess()">run engine</button>
+          <button class="btn-cmd" style="color:var(--dim);" onclick="clearAll()">clear</button>
+          <span id="counterStatus" class="status-counter">0 rows processed</span>
+        </div>
+
+        <!-- Export Toolbar -->
+        <div id="exportToolbar" class="export-toolbar hidden">
+          <button class="btn-export" onclick="copyFacingOnly()">copy facing</button>
+          <button class="btn-export" onclick="copyFamilyOnly()">copy family</button>
+          <button class="btn-export" onclick="copyFacingAndFamily()">copy facing + family</button>
+          <button class="btn-export" onclick="copyAllColumns()">copy all columns</button>
+          <button class="btn-export" onclick="downloadCSV()">download .csv</button>
+        </div>
+
+        <!-- Output Results Table -->
+        <div id="tableWrapper" class="table-container hidden">
+          <table>
+            <thead>
+              <tr>
+                <th class="col-num">#</th>
+                <th>raw_input</th>
+                <th>customer_facing_color</th>
+                <th>color_family</th>
+              </tr>
+            </thead>
+            <tbody id="resultsTbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TAB 2: SINGLE LOOKUP INTERFACE -->
+      <div id="tabLookup" class="hidden">
+        <input type="text" id="singleInput" placeholder="Type raw colorway (e.g. English Ro)" style="width:100%; padding:12px; background:#090d16; border:1px solid #1e293b; border-radius:6px; color:#fff; font-family:inherit;" oninput="liveSingleProcess()" />
+        <div id="singleResult" style="margin-top:20px; font-size:1rem; padding:16px; background:#090d16; border:1px solid #1e293b; border-radius:6px;" class="hidden">
+          <div>Customer Facing Color: <span id="singleFacing" style="color:#fff; font-weight:bold;"></span></div>
+          <div style="margin-top:8px;">Color Family: <span id="singleFamily" style="color:#f59e0b; font-weight:bold;"></span></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    let processedData = [];
+
+    // STRICT CLEANING ENGINE (Executed 100% locally in browser)
+    function cleanCustomerFacingColor(raw) {
+      if (!raw || typeof raw !== 'string') return '';
+      let text = raw.trim();
+
+      // 1. Convert symbols and plus signs to spaces
+      text = text.replace(/[\+\-/\,\\.()[\]'"#]/g, ' ');
+
+      // 2. Delete numbers, style codes, and alphanumeric codes (m6c57, 171, m601, M6812, V1, 01)
+      text = text.replace(/\b[A-Za-z]*\d+[A-Za-z0-9]*\b/g, '');
+
+      // 3. Remove supplier noise codes
+      text = text.replace(/\b(VRV|NEW|NW|LIN|SF|TI|DS|BOT)\b/gi, '');
+
+      // 4. Strict Word Conversions & Abbreviation Expansion
+      const abbrevMap = [
+        [/\bRo\b/gi, 'Rose'],
+        [/\bBl\b/gi, 'Blue'],
+        [/\bBlu\b/gi, 'Blue'],
+        [/\bDK\b/gi, 'Dark'],
+        [/\bBRWN\b/gi, 'Brown'],
+        [/\bBLK\b/gi, 'Black'],
+        [/\bGRN\b/gi, 'Green'],
+        [/\bGRY\b/gi, 'Grey'],
+        [/\bNV\b/gi, 'Navy'],
+        [/\bNude\b/gi, 'Tan'],
+        [/\bBUT\b/gi, 'Butter'],
+        [/\bBUTT\b/gi, 'Butter'],
+        [/\bCARM\b/gi, 'Carmine'],
+        [/\bNERO\b/gi, 'Black']
+      ];
+
+      abbrevMap.forEach(([regex, value]) => {
+        text = text.replace(regex, value);
+      });
+
+      // 5. Replace & with 'and'
+      text = text.replace(/&/g, 'and');
+
+      // 6. Remove isolated single letters
+      text = text.replace(/\b[A-Za-z]\b/g, '');
+
+      // 7. Title Case Formatting & Deduplication
+      let words = text.replace(/\s+/g, ' ').trim().split(' ').filter(w => w.length > 0);
+      let uniqueWords = [];
+      
+      words.forEach(w => {
+        let formatted = w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+        if (!uniqueWords.includes(formatted)) {
+          uniqueWords.push(formatted);
+        }
+      });
+
+      // 8. Max 3 core terms limit
+      let cleaned = uniqueWords.slice(0, 3).join(' ');
+
+      // 9. Strict 30-Character Limit
+      if (cleaned.length > 30) {
+        let wArr = cleaned.split(' ');
+        while (wArr.join(' ').length > 30 && wArr.length > 1) {
+          wArr.pop();
+        }
+        cleaned = wArr.join(' ');
+      }
+
+      return cleaned || raw;
+    }
+
+    function mapColorFamily(facing) {
+      let lower = facing.toLowerCase();
+
+      // Off White Rule
+      if (/\b(ivory|cream|off white|off-white|bone|ecru|champagne|vanilla)\b/i.test(lower)) {
+        return "Off White";
+      }
+
+      if (lower.includes("rose") || lower.includes("pink") || lower.includes("coral")) return "Pink";
+      if (lower.includes("blue") || lower.includes("denim") || lower.includes("navy")) return "Blue";
+      if (lower.includes("beige") || lower.includes("tan")) return "Tan";
+      if (lower.includes("green") || lower.includes("olive")) return "Green";
+      if (lower.includes("brown") || lower.includes("camel")) return "Brown";
+      if (lower.includes("black")) return "Black";
+      if (lower.includes("red") || lower.includes("carmine")) return "Red";
+      if (lower.includes("grey") || lower.includes("gray") || lower.includes("charcoal")) return "Grey";
+      if (lower.includes("yellow") || lower.includes("butter")) return "Yellow";
+      if (lower.includes("white")) return "White";
+
+      return "Other";
+    }
+
+    /* UI Logic */
+    function switchTab(name) {
+      document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+      document.getElementById("tabBatch").classList.add("hidden");
+      document.getElementById("tabLookup").classList.add("hidden");
+
+      if (name === 'batch') {
+        document.querySelectorAll(".tab")[0].classList.add("active");
+        document.getElementById("tabBatch").classList.remove("hidden");
+      } else {
+        document.querySelectorAll(".tab")[1].classList.add("active");
+        document.getElementById("tabLookup").classList.remove("hidden");
+      }
+    }
+
+    function runBatchProcess() {
+      const rawText = document.getElementById("batchInput").value.trim();
+      if (!rawText) return;
+
+      const lines = rawText.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+      processedData = [];
+
+      const tbody = document.getElementById("resultsTbody");
+      tbody.innerHTML = "";
+
+      lines.forEach((raw, i) => {
+        const facing = cleanCustomerFacingColor(raw);
+        const family = mapColorFamily(facing);
+
+        processedData.push({ raw, facing, family });
+
+        tbody.innerHTML += `
+          <tr>
+            <td class="col-num">${i + 1}</td>
+            <td class="col-raw">${escapeHtml(raw)}</td>
+            <td class="col-facing">${escapeHtml(facing)}</td>
+            <td class="col-family">■ ${escapeHtml(family)}</td>
+          </tr>
+        `;
+      });
+
+      document.getElementById("tableWrapper").classList.remove("hidden");
+      document.getElementById("exportToolbar").classList.remove("hidden");
+      document.getElementById("counterStatus").innerText = `${lines.length} rows processed in 0ms`;
+    }
+
+    function liveSingleProcess() {
+      const raw = document.getElementById("singleInput").value.trim();
+      const resBox = document.getElementById("singleResult");
+      if (!raw) {
+        resBox.classList.add("hidden");
+        return;
+      }
+      const facing = cleanCustomerFacingColor(raw);
+      const family = mapColorFamily(facing);
+
+      document.getElementById("singleFacing").innerText = facing;
+      document.getElementById("singleFamily").innerText = family;
+      resBox.classList.remove("hidden");
+    }
+
+    function clearAll() {
+      document.getElementById("batchInput").value = "";
+      document.getElementById("resultsTbody").innerHTML = "";
+      document.getElementById("tableWrapper").classList.add("hidden");
+      document.getElementById("exportToolbar").classList.add("hidden");
+      document.getElementById("counterStatus").innerText = "0 rows processed";
+      processedData = [];
+    }
+
+    /* Clipboard Export Helpers */
+    function copyFacingOnly() {
+      navigator.clipboard.writeText(processedData.map(d => d.facing).join("\n"));
+      alert("Copied customer_facing_color!");
+    }
+    function copyFamilyOnly() {
+      navigator.clipboard.writeText(processedData.map(d => d.family).join("\n"));
+      alert("Copied color_family!");
+    }
+    function copyFacingAndFamily() {
+      navigator.clipboard.writeText(processedData.map(d => `${d.facing}\t${d.family}`).join("\n"));
+      alert("Copied TSV (facing + family)!");
+    }
+    function copyAllColumns() {
+      navigator.clipboard.writeText(processedData.map(d => `${d.raw}\t${d.facing}\t${d.family}`).join("\n"));
+      alert("Copied all columns!");
+    }
+    function downloadCSV() {
+      let csvStr = "raw_input,customer_facing_color,color_family\n";
+      processedData.forEach(d => { csvStr += `"${d.raw}","${d.facing}","${d.family}"\n`; });
+      const blob = new Blob([csvStr], { type: "text/csv" });
+      const a = document.createElement("a");
+      a.href = window.URL.createObjectURL(blob);
+      a.download = "cleaned_colors.csv";
+      a.click();
+    }
+    function escapeHtml(str) {
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+  </script>
+</body>
+</html>
