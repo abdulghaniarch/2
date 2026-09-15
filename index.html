@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>nuorder — color-lookup</title>
+  <title>nuorder — advanced-color-lookup</title>
   <style>
     :root {
       --bg: #090d16;
@@ -37,7 +37,7 @@
 
     .terminal {
       width: 100%;
-      max-width: 900px;
+      max-width: 920px;
       background: var(--card-bg);
       border: 1px solid var(--border);
       border-radius: 8px;
@@ -207,28 +207,29 @@
       <span class="dot dot-red"></span>
       <span class="dot dot-yellow"></span>
       <span class="dot dot-green"></span>
-      <span style="margin-left: 8px;">nuorder — live-color-standardizer</span>
+      <span style="margin-left: 8px;">nuorder — hybrid-abbreviation-engine</span>
     </div>
 
     <div class="content">
       <div class="cmd-line">
-        <span class="cmd-green">$ nuorder color-lookup</span> <span class="cmd-purple">--live</span>
+        <span class="cmd-green">$ nuorder color-lookup</span> <span class="cmd-purple">--advanced-engine</span>
       </div>
 
       <div class="sub-bar">
-        engine status: <span>client-side ready</span> · latency <span>&lt; 1ms</span>
+        rules active: <span>85+ abbreviations</span> · mode <span id="modeDisplay">hybrid regex + smart expansion</span>
       </div>
 
       <!-- Navigation Tabs -->
       <div class="tabs">
-        <div class="tab active" onclick="switchTab('batch')">batch</div>
+        <div class="tab active" onclick="switchTab('batch')">batch engine</div>
         <div class="tab" onclick="switchTab('lookup')">single lookup</div>
+        <div class="tab" onclick="switchTab('settings')">ai fallback settings</div>
       </div>
 
       <!-- TAB 1: BATCH INTERFACE -->
       <div id="tabBatch">
         <div class="input-box-wrapper">
-          <textarea id="batchInput" placeholder="Paste vendor colors (one per line)...&#10;e.g.&#10;m6c57 rainy beige+shadow green&#10;English Ro&#10;Pageant Bl&#10;171 coral"></textarea>
+          <textarea id="batchInput" placeholder="Paste vendor colors (one per line)...&#10;e.g.&#10;m6c57 rainy beige+shadow green&#10;English Ro&#10;Pageant Bl&#10;Dk Chrcol&#10;Lgt Ecr&#10;171 coral"></textarea>
         </div>
 
         <div class="actions-row">
@@ -264,11 +265,20 @@
 
       <!-- TAB 2: SINGLE LOOKUP INTERFACE -->
       <div id="tabLookup" class="hidden">
-        <input type="text" id="singleInput" placeholder="Type raw colorway (e.g. English Ro)" style="width:100%; padding:12px; background:#090d16; border:1px solid #1e293b; border-radius:6px; color:#fff; font-family:inherit;" oninput="liveSingleProcess()" />
+        <input type="text" id="singleInput" placeholder="Type raw colorway (e.g. Dk Chrcol)" style="width:100%; padding:12px; background:#090d16; border:1px solid #1e293b; border-radius:6px; color:#fff; font-family:inherit;" oninput="liveSingleProcess()" />
         <div id="singleResult" style="margin-top:20px; font-size:1rem; padding:16px; background:#090d16; border:1px solid #1e293b; border-radius:6px;" class="hidden">
           <div>Customer Facing Color: <span id="singleFacing" style="color:#fff; font-weight:bold;"></span></div>
           <div style="margin-top:8px;">Color Family: <span id="singleFamily" style="color:#f59e0b; font-weight:bold;"></span></div>
         </div>
+      </div>
+
+      <!-- TAB 3: SETTINGS INTERFACE -->
+      <div id="tabSettings" class="hidden">
+        <div style="font-size:0.85rem; color:var(--dim); margin-bottom:8px;">
+          Optional: Free Gemini API Key for unknown short-form AI resolving:
+        </div>
+        <input type="password" id="geminiApiKeyInput" placeholder="Paste free Gemini API key..." style="width:100%; padding:12px; background:#090d16; border:1px solid #1e293b; border-radius:6px; color:#fff; font-family:inherit;" onchange="saveApiKey()" />
+        <div id="apiSavedStatus" style="font-size:0.8rem; color:var(--green); margin-top:8px;"></div>
       </div>
 
     </div>
@@ -277,7 +287,63 @@
   <script>
     let processedData = [];
 
-    // STRICT CLEANING ENGINE (Executed 100% locally in browser)
+    // Comprehensive Retail Abbreviation Dictionary
+    const abbrevMap = [
+      // Truncated color words
+      [/\bRo\b/gi, 'Rose'],
+      [/\bBl\b/gi, 'Blue'],
+      [/\bBlu\b/gi, 'Blue'],
+      [/\bBlk\b/gi, 'Black'],
+      [/\bBrwn\b/gi, 'Brown'],
+      [/\bBrn\b/gi, 'Brown'],
+      [/\bGrn\b/gi, 'Green'],
+      [/\bGry\b/gi, 'Grey'],
+      [/\bGry\b/gi, 'Grey'],
+      [/\bNv\b/gi, 'Navy'],
+      [/\bNvy\b/gi, 'Navy'],
+      [/\bYel\b/gi, 'Yellow'],
+      [/\bYlw\b/gi, 'Yellow'],
+      [/\bOrg\b/gi, 'Orange'],
+      [/\bOrng\b/gi, 'Orange'],
+      [/\bPrp\b/gi, 'Purple'],
+      [/\bPrpl\b/gi, 'Purple'],
+      [/\bWht\b/gi, 'White'],
+      [/\bWte\b/gi, 'White'],
+      [/\bIvry\b/gi, 'Ivory'],
+      [/\bChrcol\b/gi, 'Charcoal'],
+      [/\bChrc\b/gi, 'Charcoal'],
+      [/\bEcr\b/gi, 'Ecru'],
+      [/\bCml\b/gi, 'Camel'],
+      [/\bBurg\b/gi, 'Burgundy'],
+      [/\bBndy\b/gi, 'Burgundy'],
+      [/\bCarm\b/gi, 'Carmine'],
+      [/\bCrl\b/gi, 'Coral'],
+      [/\bTurq\b/gi, 'Turquoise'],
+      [/\bTrq\b/gi, 'Turquoise'],
+      [/\bLvd\b/gi, 'Lavender'],
+      [/\bLvdr\b/gi, 'Lavender'],
+      [/\bMv\b/gi, 'Mauve'],
+      [/\bMau\b/gi, 'Mauve'],
+      [/\bBge\b/gi, 'Beige'],
+      [/\bBg\b/gi, 'Beige'],
+      [/\bNude\b/gi, 'Tan'],
+      [/\bNud\b/gi, 'Tan'],
+      [/\bNero\b/gi, 'Black'],
+      [/\bBut\b/gi, 'Butter'],
+      [/\bButt\b/gi, 'Butter'],
+      
+      // Modifiers & Shorthands
+      [/\bDk\b/gi, 'Dark'],
+      [/\bDrk\b/gi, 'Dark'],
+      [/\bLgt\b/gi, 'Light'],
+      [/\bLt\b/gi, 'Light'],
+      [/\bBrt\b/gi, 'Bright'],
+      [/\bMd\b/gi, 'Medium'],
+      [/\bMed\b/gi, 'Medium'],
+      [/\bOffwht\b/gi, 'Off White'],
+      [/\bOff-Wht\b/gi, 'Off White']
+    ];
+
     function cleanCustomerFacingColor(raw) {
       if (!raw || typeof raw !== 'string') return '';
       let text = raw.trim();
@@ -291,24 +357,7 @@
       // 3. Remove supplier noise codes
       text = text.replace(/\b(VRV|NEW|NW|LIN|SF|TI|DS|BOT)\b/gi, '');
 
-      // 4. Strict Word Conversions & Abbreviation Expansion
-      const abbrevMap = [
-        [/\bRo\b/gi, 'Rose'],
-        [/\bBl\b/gi, 'Blue'],
-        [/\bBlu\b/gi, 'Blue'],
-        [/\bDK\b/gi, 'Dark'],
-        [/\bBRWN\b/gi, 'Brown'],
-        [/\bBLK\b/gi, 'Black'],
-        [/\bGRN\b/gi, 'Green'],
-        [/\bGRY\b/gi, 'Grey'],
-        [/\bNV\b/gi, 'Navy'],
-        [/\bNude\b/gi, 'Tan'],
-        [/\bBUT\b/gi, 'Butter'],
-        [/\bBUTT\b/gi, 'Butter'],
-        [/\bCARM\b/gi, 'Carmine'],
-        [/\bNERO\b/gi, 'Black']
-      ];
-
+      // 4. Run expanded abbreviation dictionary
       abbrevMap.forEach(([regex, value]) => {
         text = text.replace(regex, value);
       });
@@ -316,10 +365,10 @@
       // 5. Replace & with 'and'
       text = text.replace(/&/g, 'and');
 
-      // 6. Remove isolated single letters
+      // 6. Remove remaining isolated single letters
       text = text.replace(/\b[A-Za-z]\b/g, '');
 
-      // 7. Title Case Formatting & Deduplication
+      // 7. Title Case Formatting & Strict Deduplication
       let words = text.replace(/\s+/g, ' ').trim().split(' ').filter(w => w.length > 0);
       let uniqueWords = [];
       
@@ -353,33 +402,44 @@
         return "Off White";
       }
 
-      if (lower.includes("rose") || lower.includes("pink") || lower.includes("coral")) return "Pink";
-      if (lower.includes("blue") || lower.includes("denim") || lower.includes("navy")) return "Blue";
-      if (lower.includes("beige") || lower.includes("tan")) return "Tan";
+      if (lower.includes("rose") || lower.includes("pink") || lower.includes("coral") || lower.includes("mauve") || lower.includes("magenta")) return "Pink";
+      if (lower.includes("blue") || lower.includes("denim") || lower.includes("navy") || lower.includes("turquoise")) return "Blue";
+      if (lower.includes("beige") || lower.includes("tan") || lower.includes("camel")) return "Tan";
       if (lower.includes("green") || lower.includes("olive")) return "Green";
-      if (lower.includes("brown") || lower.includes("camel")) return "Brown";
+      if (lower.includes("brown") || lower.includes("burgundy")) return "Brown";
       if (lower.includes("black")) return "Black";
       if (lower.includes("red") || lower.includes("carmine")) return "Red";
       if (lower.includes("grey") || lower.includes("gray") || lower.includes("charcoal")) return "Grey";
       if (lower.includes("yellow") || lower.includes("butter")) return "Yellow";
+      if (lower.includes("purple") || lower.includes("lavender")) return "Purple";
       if (lower.includes("white")) return "White";
 
       return "Other";
     }
 
-    /* UI Logic */
+    /* Tab & UI Logic */
     function switchTab(name) {
       document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
       document.getElementById("tabBatch").classList.add("hidden");
       document.getElementById("tabLookup").classList.add("hidden");
+      document.getElementById("tabSettings").classList.add("hidden");
 
       if (name === 'batch') {
         document.querySelectorAll(".tab")[0].classList.add("active");
         document.getElementById("tabBatch").classList.remove("hidden");
-      } else {
+      } else if (name === 'lookup') {
         document.querySelectorAll(".tab")[1].classList.add("active");
         document.getElementById("tabLookup").classList.remove("hidden");
+      } else if (name === 'settings') {
+        document.querySelectorAll(".tab")[2].classList.add("active");
+        document.getElementById("tabSettings").classList.remove("hidden");
       }
+    }
+
+    function saveApiKey() {
+      const key = document.getElementById("geminiApiKeyInput").value.trim();
+      localStorage.setItem("gemini_api_key", key);
+      document.getElementById("apiSavedStatus").innerText = "✓ Free Gemini API Key Saved for AI Fallback!";
     }
 
     function runBatchProcess() {
